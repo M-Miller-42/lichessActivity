@@ -1,0 +1,295 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Lichess Activity Heatmap</title>
+    <style>
+        body {
+            color: #fff;
+            background-color: #222;
+        }
+
+        .day {
+            --day-size: 1em;
+            width: var(--day-size);
+            height: var(--day-size);
+            border-radius: 0.2em;
+            background-color: #080064ff;
+            background-image: url(data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAQEAAAABCAYAAADemxtJAAAACXBIWXMAAA7DAAAOwwHHb6hkAAAAGXRFWHRTb2Z0d2FyZQB3d3cuaW5rc2NhcGUub3Jnm+48GgAAAKdJREFUOI2NkEESwyAMAxc+3o8XqQeYYMBNckJC9hpTvvoYGdsgQzi9eIH2u9NPluZ9ws/nrT0ZP33T1nO/j0AFu2JV7ApB2xUyfdWW574kf1dbzloN/4b7t/aZezcjry2I/s8GjFHQh7dRyGx6f2AoZMaDH3i7D9ow5iV8GPOnvniLn/p6jzN+sm/k7/se+91l/b65IQtZtHHKQmjJ1rxNz54nvFHzA4thDpAaUxnxAAAAAElFTkSuQmCC);
+            background-size: cover;
+            background-position-x: calc(256 * var(--day-size) * (var(--r) - 1));
+        }
+
+        .year::before {
+            content: attr(data-year);
+            position: absolute;
+            top: 0.4em;
+        }
+
+        .year {
+            position: relative;
+            height: 8em;
+            display: flex;
+            flex-direction: column;
+            flex-wrap: wrap;
+            background: black;
+            align-content: flex-start;
+            gap: 0.1em 0.1em;
+            margin-top: 1em;
+            border-radius: 0.2em;
+            padding: 0.3em;
+            padding-top: 2em;
+        }
+
+        .year:first-child {
+            /* align-items: flex-start; */
+        }
+
+        #calendar {
+            display: flex;
+            flex-direction: column;
+        }
+    </style>
+</head>
+
+<body>
+    <script>
+        /** Generate cryptographically strong random string
+ * @param size The desired length of the string
+ * @returns The random string
+ */
+        function random(size) {
+            const mask =
+                "abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789-._~";
+            let result = "";
+            const randomUints = crypto.getRandomValues(new Uint8Array(size));
+            for (let i = 0; i < size; i++) {
+                // cap the value of the randomIndex to mask.length - 1
+                const randomIndex = randomUints[i] % mask.length;
+                result += mask[randomIndex];
+            }
+            return result;
+        }
+
+        /** Generate a PKCE challenge verifier
+         * @param length Length of the verifier
+         * @returns A random verifier `length` characters long
+         */
+        function generateVerifier(length) {
+            return random(length);
+        }
+
+        /** Generate a PKCE code challenge from a code verifier
+         * @param code_verifier
+         * @returns The base64 url encoded code challenge
+         */
+        async function generateChallenge(code_verifier) {
+            const buffer = await crypto.subtle.digest(
+                "SHA-256",
+                new TextEncoder().encode(code_verifier)
+            );
+            // Generate base64url string
+            // btoa is deprecated in Node.js but is used here for web browser compatibility
+            // (which has no good replacement yet, see also https://github.com/whatwg/html/issues/6811)
+            return btoa(String.fromCharCode(...new Uint8Array(buffer)))
+                .replace(/\//g, '_')
+                .replace(/\+/g, '-')
+                .replace(/=/g, '');
+        }
+    </script>
+    <script>
+        const apiEndpoint = "https://lichess.org/api/"
+        const gamesEndpoint = "https://lichess.org/@/"
+        const clientId = "dailyActivityHeatmap"
+        const clientUrl = (() => {
+            const url = new URL(location.href);
+            url.search = '';
+            return url.href;
+        })();
+
+        var headers
+
+        function getOrCreateYear(year, years) {
+            if (years[year]) {
+                return years[year]
+            } else {
+                yearEl = document.createElement("div")
+                yearEl.classList.add('year')
+                yearEl.style.order = year
+                yearEl.dataset.year = year
+                calendar.appendChild(yearEl)
+                years[year] = yearEl
+                return yearEl
+            }
+        }
+
+        function getOrCreateDay(date, previous) {
+            if (previous && previous.date.getTime() == date.getTime()) {
+                return previous.dayEl
+            } else {
+                dayEl = document.createElement('a')
+                dayEl.classList.add('day')
+                dayEl.href = createUrlForDay(date)
+                dayEl.target = '_blank'
+                return dayEl
+            }
+        }
+
+        function toLocalYYYYMMDD(date) {
+            var local = new Date(date);
+            local.setMinutes(date.getMinutes() - date.getTimezoneOffset());
+            return local.toJSON().slice(0, 10);
+        }
+
+        function createUrlForDay(date) {
+            dayAfter = new Date(date)
+            dayAfter.setDate(date.getDate() + 1)
+            let url = new URL(gamesEndpoint)
+            url.pathname += usernameInput.value
+            url.pathname += '/search'
+            url.searchParams.append('dateMin', toLocalYYYYMMDD(date))
+            url.searchParams.append('dateMax', toLocalYYYYMMDD(dayAfter))
+            return url
+        }
+
+        (async () => {
+            token = localStorage.getItem('accessToken')
+            console.log("Stored token is ", token);
+            if (token == null) {
+                code = localStorage.getItem('code')
+                console.log('No token. Stored code is', code, window.origin);
+                if (code == null) {
+                    urlParams = new URLSearchParams(window.location.search)
+                    code = urlParams.get('code')
+                    if (!code) return
+                }
+                localStorage.setItem('code', code)
+                window.location.search && (window.location.search = "")
+
+                codeVerifier = localStorage.getItem('codeVerifier')
+                if (!codeVerifier) throw new Error('Lost codeVerifier');
+                console.log("Found code", code);
+                response = await fetch(apiEndpoint + 'token', {
+                    method: 'POST', body: new URLSearchParams({
+                        grant_type: "authorization_code",
+                        code: code,
+                        redirect_uri: clientUrl,
+                        client_id: clientId,
+                        code_verifier: codeVerifier
+                    })
+                })
+                json = await response.json()
+                json.access_token && localStorage.setItem("accessToken", json.access_token)
+
+            } else {
+                console.log("Found token", token);
+                headers = { Authorization: 'Bearer ' + token }
+                response = await fetch(apiEndpoint + 'account', { headers })
+                json = await response.json()
+                loginBtn.textContent = 'Logout as ' + json.username
+                loginBtn.onClick = logout()
+            }
+
+        })()
+
+        async function logout() {
+            await fetch(apiEndpoint + 'token', { headers, method: 'DELETE' })
+            headers = {}
+            localStorage.clear()
+            statusInfo.innerText = "Logged out"
+            loginBtn.onClick = showLogin()
+            loginBtn.textContent = "Login to Lichess"
+        }
+
+        async function showLogin() {
+            codeVerifier = generateVerifier(129)
+            localStorage.setItem('codeVerifier', codeVerifier)
+            challenge = await generateChallenge(codeVerifier)
+            console.warn(codeVerifier, challenge);
+            url = new URL('https://lichess.org/oauth')
+            url.searchParams.append('response_type', 'code')
+            url.searchParams.append('redirect_uri', clientUrl)
+            url.searchParams.append('client_id', clientId)
+            url.searchParams.append('scope', '')
+            url.searchParams.append('state', random(33))
+            url.searchParams.append('code_challenge', challenge)
+            url.searchParams.append('code_challenge_method', 'S256')
+            window.location = url
+        }
+
+
+
+        async function refresh() {
+            years = {}
+            days = {}
+
+            let lastThisChunk
+            let lastPreviousChunk
+            maxPerDay = 0
+            gameCounter = 0
+
+            const aborter = new AbortController();
+            abortBtn.addEventListener("click", () => { aborter.abort(); statusInfo.innerText = " Aborted!" });
+            submitBtn.disabled = true
+            submitBtn.textContent = "loading..."
+            since = datePicker.valueAsDate?.getTime()
+
+            let url = new URL(apiEndpoint)
+            url.pathname += "games/user/"
+            url.pathname += usernameInput.value
+            url.searchParams.append('sort', 'dateAsc')
+            url.searchParams.append('moves', 'false')
+            url.searchParams.append('evals', 'false')
+            since && url.searchParams.append('since', since)
+
+            headers = { Authorization: 'Bearer ' + 'lio_fbAKDtbCXqPYbLjVvHbheBbmUqQJj1Da' }
+            const response = await fetch(url, { signal: aborter.signal, headers });
+
+            for await (const chunk of response.body) {
+                let games = new TextDecoder().decode(chunk).split('\n\n\n').filter(game => game)
+
+                games.forEach(game => {
+                    statusInfo.innerText = `Downloaded ${gameCounter += 1} games`
+                    const { year, month, day } = game.match(/\[Date "(?<year>\d\d\d\d)\.(?<month>\d\d)\.(?<day>\d\d)"\]/).groups
+                    const date = new Date(year, month - 1, day)
+                    let entry = days[date.getTime()] ?? 0
+                    days[date.getTime()] = entry + 1
+                    maxPerDay = Math.max(maxPerDay, entry + 1)
+                    lastThisChunk = date
+                });
+
+                lastPreviousChunk = lastPreviousChunk ?? new Date(lastThisChunk.getFullYear(), 0, 1);
+                calendar.style.setProperty('--max', maxPerDay);
+
+                var previous
+                for (var date = lastPreviousChunk; date <= lastThisChunk; date.setDate(date.getDate() + 1)) {
+                    gamesPlayed = days[date.getTime()] ?? 0
+                    dayEl = getOrCreateDay(date, previous)
+                    previous = { date: new Date(date), dayEl }
+                    dayEl.title = gamesPlayed + " games played on " + date.toDateString()
+                    dayEl.style.setProperty('--x', gamesPlayed);
+                    dayEl.style.setProperty('--r', 'calc(var(--x) / var(--max)');
+                    yearEl = getOrCreateYear(date.getFullYear(), years)
+                    yearEl.appendChild(dayEl)
+                }
+                lastPreviousChunk = lastThisChunk
+            }
+            statusInfo.innerText += ' Done!'
+
+        }
+
+    </script>
+
+    <input id='usernameInput' type="text" placeholder="username">
+    <label for="datePicker">Start date (default: forever)</label>
+    <input id="datePicker" type="date">
+    <button id='submitBtn' onclick="refresh()">Go</button>
+    <button id="abortBtn">Abort</button>
+    <button id="loginBtn" onclick="showLogin()">Login to Lichess</button>
+    <pre id="statusInfo"></pre>
+    <div id="calendar"></div>
+</body>
+
+</html>
