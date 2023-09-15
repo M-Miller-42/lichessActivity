@@ -6,79 +6,126 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Lichess Activity Heatmap</title>
     <style>
+        *,
+        ::before,
+        ::after {
+            box-sizing: border-box;
+        }
+
         body {
             color: #fff;
             background-color: #222;
-        }
-
-        .day {
-            --day-size: 1em;
-            width: var(--day-size);
-            height: var(--day-size);
-            border-radius: 0.2em;
-            background-color: #080064ff;
-            background-image: url(data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAQEAAAABCAYAAADemxtJAAAACXBIWXMAAA7DAAAOwwHHb6hkAAAAGXRFWHRTb2Z0d2FyZQB3d3cuaW5rc2NhcGUub3Jnm+48GgAAAKdJREFUOI2NkEESwyAMAxc+3o8XqQeYYMBNckJC9hpTvvoYGdsgQzi9eIH2u9NPluZ9ws/nrT0ZP33T1nO/j0AFu2JV7ApB2xUyfdWW574kf1dbzloN/4b7t/aZezcjry2I/s8GjFHQh7dRyGx6f2AoZMaDH3i7D9ow5iV8GPOnvniLn/p6jzN+sm/k7/se+91l/b65IQtZtHHKQmjJ1rxNz54nvFHzA4thDpAaUxnxAAAAAElFTkSuQmCC);
-            background-size: cover;
-            background-position-x: calc(256 * var(--day-size) * (var(--r) - 1));
-        }
-
-        .year::before {
-            content: attr(data-year);
-            position: absolute;
-            top: 0.4em;
-        }
-
-        .year {
-            position: relative;
-            height: 8em;
+            font-family: sans;
+            margin: 5em;
             display: flex;
             flex-direction: column;
-            flex-wrap: wrap;
-            background: black;
-            align-content: flex-start;
-            gap: 0.1em 0.1em;
-            margin-top: 1em;
-            border-radius: 0.2em;
-            padding: 0.3em;
-            padding-top: 2em;
+            align-items: center;
         }
 
-        .year:first-child {
-            /* align-items: flex-start; */
+        #inputForm {
+            div {
+                display: flex;
+
+                [type=submit] {
+                    flex: 0;
+                }
+            }
+
+            input {
+                width: 100%;
+                margin-bottom: 1em;
+            }
         }
+
 
         #calendar {
             display: flex;
             flex-direction: column;
+
+            .year {
+                --day-size: 1em;
+                --gap: 2px;
+                --p: 1em;
+                --pl: 4.5em;
+                --weekday-width: 1.5em;
+                position: relative;
+                padding: var(--p);
+                padding-left: var(--pl);
+                margin: 1em;
+                display: grid;
+                grid-template-rows: repeat(7, 1fr);
+                grid-auto-columns: var(--day-size);
+                grid-auto-flow: column;
+                grid-template-columns: var(--weekday-width) auto;
+                justify-content: left;
+                gap: var(--gap);
+                background: #363440;
+                border-radius: 0.5em;
+                min-width: calc(var(--pl) + var(--weekday-width) + 54 * (var(--day-size) + var(--gap)) + var(--p));
+
+                &::before {
+                    content: attr(data-year);
+                    position: absolute;
+                    left: 0.1em;
+                    height: 100%;
+                    text-align: center;
+                    writing-mode: sideways-rl;
+                    font-size: 3em;
+                }
+
+
+                * {
+                    width: var(--day-size);
+                    height: var(--day-size);
+                }
+
+
+                .day {
+                    border-radius: 0.2em;
+                    background-color: #080064ff;
+                    background-image: url(data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAQEAAAABCAYAAADemxtJAAAACXBIWXMAAA7DAAAOwwHHb6hkAAAAGXRFWHRTb2Z0d2FyZQB3d3cuaW5rc2NhcGUub3Jnm+48GgAAAKdJREFUOI2NkEESwyAMAxc+3o8XqQeYYMBNckJC9hpTvvoYGdsgQzi9eIH2u9NPluZ9ws/nrT0ZP33T1nO/j0AFu2JV7ApB2xUyfdWW574kf1dbzloN/4b7t/aZezcjry2I/s8GjFHQh7dRyGx6f2AoZMaDH3i7D9ow5iV8GPOnvniLn/p6jzN+sm/k7/se+91l/b65IQtZtHHKQmjJ1rxNz54nvFHzA4thDpAaUxnxAAAAAElFTkSuQmCC);
+                    background-size: cover;
+                    background-position-x: calc(256 * var(--day-size) * (var(--r) - 1));
+                }
+
+                span {
+                    width: initial;
+                    font-family: mono;
+                }
+            }
         }
     </style>
 </head>
 
 <body>
+    <h1>Daily Lichess Activity Heatmap</h1>
+    <form id="inputForm">
+        <div>
+            <input id="usernameInput" type="text" placeholder="username" required>
+            <input type="submit" id="submitBtn" value="Go">
+        </div>
+        <label for="datePicker">Start date (optional)</label>
+        <input id="datePicker" type="date">
+    </form>
+    <button id="loginBtn" onclick="login()">Login to Lichess (optional)</button>
+    <abbr title="The Lichess API is faster when logged in">Why?</abbr>
+    <pre id="statusInfo"></pre>
+    <div id="calendar"></div>
+
+    <!-- Snippet for PKCE taken from 
+    https://github.com/crouchcd/pkce-challenge/blob/0b5a1a35b83bfb973ca492a2d8df9fe1b163d066/src/index.ts -->
     <script>
-        /** Generate cryptographically strong random string
- * @param size The desired length of the string
- * @returns The random string
- */
-        function random(size) {
+        function randomString(length) {
             const mask =
-                "abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789-._~";
-            let result = "";
-            const randomUints = crypto.getRandomValues(new Uint8Array(size));
-            for (let i = 0; i < size; i++) {
+                'abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789-._~';
+            let result = '';
+            const randomUints = crypto.getRandomValues(new Uint8Array(length));
+            for (let i = 0; i < length; i++) {
                 // cap the value of the randomIndex to mask.length - 1
                 const randomIndex = randomUints[i] % mask.length;
                 result += mask[randomIndex];
             }
             return result;
-        }
-
-        /** Generate a PKCE challenge verifier
-         * @param length Length of the verifier
-         * @returns A random verifier `length` characters long
-         */
-        function generateVerifier(length) {
-            return random(length);
         }
 
         /** Generate a PKCE code challenge from a code verifier
@@ -87,7 +134,7 @@
          */
         async function generateChallenge(code_verifier) {
             const buffer = await crypto.subtle.digest(
-                "SHA-256",
+                'SHA-256',
                 new TextEncoder().encode(code_verifier)
             );
             // Generate base64url string
@@ -99,54 +146,74 @@
                 .replace(/=/g, '');
         }
     </script>
+
+
     <script>
-        const apiEndpoint = "https://lichess.org/api/"
-        const gamesEndpoint = "https://lichess.org/@/"
-        const clientId = "dailyActivityHeatmap"
+        'use strict'
+        const lichessApi = 'https://lichess.org/api/'
+        const lichessOauth = 'https://lichess.org/oauth'
+        const lichessGames = 'https://lichess.org/@/'
+        const clientId = 'dailyActivityHeatmap'
         const clientUrl = (() => {
-            const url = new URL(location.href);
-            url.search = '';
-            return url.href;
-        })();
+            const url = new URL(location.href)
+            url.search = ''
+            return url.href
+        })()
+        let headers
 
-        var headers
 
-        function getOrCreateYear(year, years) {
+        function getOrCreateYearNode(year, years) {
             if (years[year]) {
                 return years[year]
-            } else {
-                yearEl = document.createElement("div")
-                yearEl.classList.add('year')
-                yearEl.style.order = year
-                yearEl.dataset.year = year
-                calendar.appendChild(yearEl)
-                years[year] = yearEl
-                return yearEl
             }
+            const yearEl = document.createElement('div')
+            yearEl.classList.add('year')
+            yearEl.style.order = year
+            yearEl.dataset.year = year
+
+            'Mo,Tu,We,Th,Fr,Sa,Su'.split(',').forEach(weekday => {
+                const weekdayEl = document.createElement('span')
+                weekdayEl.textContent = weekday
+
+
+
+                
+                yearEl.appendChild(weekdayEl)
+            })
+
+            // If the year does not start with Monday, add some filler days
+            // Starting with Monday=0
+            const firstWeekdayIndex = (new Date(year, 0, 1).getDay() + 6) % 7
+            for (const _ of Array(firstWeekdayIndex)) {
+                yearEl.appendChild(document.createElement('div'))
+            }
+
+            calendar.appendChild(yearEl)
+            years[year] = yearEl
+            return yearEl
         }
 
-        function getOrCreateDay(date, previous) {
+        function getOrCreateDayNode(date, previous) {
             if (previous && previous.date.getTime() == date.getTime()) {
                 return previous.dayEl
-            } else {
-                dayEl = document.createElement('a')
-                dayEl.classList.add('day')
-                dayEl.href = createUrlForDay(date)
-                dayEl.target = '_blank'
-                return dayEl
             }
+            const dayEl = document.createElement('a')
+            dayEl.classList.add('day')
+            dayEl.href = createUrlForDay(date)
+            dayEl.target = '_blank'
+            return dayEl
         }
 
         function toLocalYYYYMMDD(date) {
-            var local = new Date(date);
-            local.setMinutes(date.getMinutes() - date.getTimezoneOffset());
-            return local.toJSON().slice(0, 10);
+            const local = new Date(date)
+            local.setMinutes(date.getMinutes() - date.getTimezoneOffset())
+            return local.toJSON().slice(0, 10)
         }
 
         function createUrlForDay(date) {
-            dayAfter = new Date(date)
+            const dayAfter = new Date(date)
             dayAfter.setDate(date.getDate() + 1)
-            let url = new URL(gamesEndpoint)
+            const url = new URL(lichessGames)
             url.pathname += usernameInput.value
             url.pathname += '/search'
             url.searchParams.append('dateMin', toLocalYYYYMMDD(date))
@@ -154,142 +221,170 @@
             return url
         }
 
-        (async () => {
-            token = localStorage.getItem('accessToken')
-            console.log("Stored token is ", token);
-            if (token == null) {
-                code = localStorage.getItem('code')
-                console.log('No token. Stored code is', code, window.origin);
-                if (code == null) {
-                    urlParams = new URLSearchParams(window.location.search)
-                    code = urlParams.get('code')
-                    if (!code) return
-                }
-                localStorage.setItem('code', code)
-                window.location.search && (window.location.search = "")
-
-                codeVerifier = localStorage.getItem('codeVerifier')
-                if (!codeVerifier) throw new Error('Lost codeVerifier');
-                console.log("Found code", code);
-                response = await fetch(apiEndpoint + 'token', {
-                    method: 'POST', body: new URLSearchParams({
-                        grant_type: "authorization_code",
-                        code: code,
-                        redirect_uri: clientUrl,
-                        client_id: clientId,
-                        code_verifier: codeVerifier
-                    })
-                })
-                json = await response.json()
-                json.access_token && localStorage.setItem("accessToken", json.access_token)
-
-            } else {
-                console.log("Found token", token);
-                headers = { Authorization: 'Bearer ' + token }
-                response = await fetch(apiEndpoint + 'account', { headers })
-                json = await response.json()
-                loginBtn.textContent = 'Logout as ' + json.username
-                loginBtn.onClick = logout()
-            }
-
-        })()
-
         async function logout() {
-            await fetch(apiEndpoint + 'token', { headers, method: 'DELETE' })
+            console.log('Logging out')
+            await fetch(lichessApi + 'token', { headers, method: 'DELETE' })
             headers = {}
             localStorage.clear()
-            statusInfo.innerText = "Logged out"
-            loginBtn.onClick = showLogin()
-            loginBtn.textContent = "Login to Lichess"
+            window.history.replaceState(null, document.title, clientUrl)
+            statusInfo.innerText = 'Logged out'
+            loginBtn.onclick = login
+            loginBtn.textContent = 'Login to Lichess (optional)'
+
         }
 
-        async function showLogin() {
-            codeVerifier = generateVerifier(129)
+        async function login() {
+            const codeVerifier = randomString(129)
             localStorage.setItem('codeVerifier', codeVerifier)
-            challenge = await generateChallenge(codeVerifier)
-            console.warn(codeVerifier, challenge);
-            url = new URL('https://lichess.org/oauth')
+            const challenge = await generateChallenge(codeVerifier)
+            const url = new URL(lichessOauth)
             url.searchParams.append('response_type', 'code')
             url.searchParams.append('redirect_uri', clientUrl)
             url.searchParams.append('client_id', clientId)
             url.searchParams.append('scope', '')
-            url.searchParams.append('state', random(33))
+            url.searchParams.append('state', randomString(33))
             url.searchParams.append('code_challenge', challenge)
             url.searchParams.append('code_challenge_method', 'S256')
             window.location = url
         }
 
+        function resetBtn() {
+            submitBtn.value = 'Go'
+            submitBtn.onclick = undefined
+        }
 
-
-        async function refresh() {
-            years = {}
-            days = {}
-
-            let lastThisChunk
-            let lastPreviousChunk
-            maxPerDay = 0
-            gameCounter = 0
-
-            const aborter = new AbortController();
-            abortBtn.addEventListener("click", () => { aborter.abort(); statusInfo.innerText = " Aborted!" });
-            submitBtn.disabled = true
-            submitBtn.textContent = "loading..."
-            since = datePicker.valueAsDate?.getTime()
-
-            let url = new URL(apiEndpoint)
-            url.pathname += "games/user/"
-            url.pathname += usernameInput.value
+        function createApiUrl(username, since) {
+            const url = new URL(lichessApi)
+            url.pathname += 'games/user/'
+            url.pathname += username
             url.searchParams.append('sort', 'dateAsc')
             url.searchParams.append('moves', 'false')
             url.searchParams.append('evals', 'false')
             since && url.searchParams.append('since', since)
+            return url
+        }
 
-            headers = { Authorization: 'Bearer ' + 'lio_fbAKDtbCXqPYbLjVvHbheBbmUqQJj1Da' }
-            const response = await fetch(url, { signal: aborter.signal, headers });
+        async function drawCalendar() {
+            statusInfo.innerText = `Requesting games for user '${usernameInput.value}'`
+
+            const aborter = new AbortController()
+            const since = datePicker.valueAsDate?.getTime()
+            const years = {}
+            const days = {}
+            let maxPerDay = 0
+            let gameCounter = 0
+            let previousDay
+            let lastInThisChunk
+            let lastInPreviousChunk
+
+            submitBtn.value = 'Abort'
+            submitBtn.onclick = e => { e.preventDefault(); aborter.abort(); statusInfo.innerText += ' Aborted!'; resetBtn() }
+
+            calendar.replaceChildren()
+
+            const url = createApiUrl(usernameInput.value, since)
+            const response = await fetch(url, { signal: aborter.signal, headers })
+            if (!response.ok) {
+                statusInfo.innerText = `Error ${response.status} while fetching games for user '${usernameInput.value}'`
+                resetBtn()
+                return
+            }
 
             for await (const chunk of response.body) {
-                let games = new TextDecoder().decode(chunk).split('\n\n\n').filter(game => game)
+                const games = new TextDecoder().decode(chunk).split('\n\n\n').filter(game => game)
 
-                games.forEach(game => {
+                for (const game of games) {
                     statusInfo.innerText = `Downloaded ${gameCounter += 1} games`
                     const { year, month, day } = game.match(/\[Date "(?<year>\d\d\d\d)\.(?<month>\d\d)\.(?<day>\d\d)"\]/).groups
                     const date = new Date(year, month - 1, day)
-                    let entry = days[date.getTime()] ?? 0
+                    const entry = days[date.getTime()] ?? 0
                     days[date.getTime()] = entry + 1
                     maxPerDay = Math.max(maxPerDay, entry + 1)
-                    lastThisChunk = date
-                });
+                    lastInThisChunk = date
+                }
 
-                lastPreviousChunk = lastPreviousChunk ?? new Date(lastThisChunk.getFullYear(), 0, 1);
-                calendar.style.setProperty('--max', maxPerDay);
+                calendar.style.setProperty('--max', maxPerDay)
 
-                var previous
-                for (var date = lastPreviousChunk; date <= lastThisChunk; date.setDate(date.getDate() + 1)) {
-                    gamesPlayed = days[date.getTime()] ?? 0
-                    dayEl = getOrCreateDay(date, previous)
-                    previous = { date: new Date(date), dayEl }
-                    dayEl.title = gamesPlayed + " games played on " + date.toDateString()
-                    dayEl.style.setProperty('--x', gamesPlayed);
-                    dayEl.style.setProperty('--r', 'calc(var(--x) / var(--max)');
-                    yearEl = getOrCreateYear(date.getFullYear(), years)
+                // Fallback to first day of year
+                lastInPreviousChunk = lastInPreviousChunk ?? new Date(lastInThisChunk.getFullYear(), 0, 1)
+                for (let date = lastInPreviousChunk; date <= lastInThisChunk; date.setDate(date.getDate() + 1)) {
+                    const gamesPlayed = days[date.getTime()] ?? 0
+                    const dayEl = getOrCreateDayNode(date, previousDay)
+                    previousDay = { date: new Date(date), dayEl }
+                    dayEl.title = gamesPlayed + ' games played on ' + date.toDateString()
+                    dayEl.style.setProperty('--x', gamesPlayed)
+                    dayEl.style.setProperty('--r', 'calc(var(--x) / var(--max)')
+                    const yearEl = getOrCreateYearNode(date.getFullYear(), years)
                     yearEl.appendChild(dayEl)
                 }
-                lastPreviousChunk = lastThisChunk
+                lastInPreviousChunk = lastInThisChunk
             }
             statusInfo.innerText += ' Done!'
-
+            resetBtn()
         }
 
-    </script>
+        async function InitializeWithToken(token) {
+            console.log('Using token', token)
+            headers = { Authorization: 'Bearer ' + token }
+            const response = await fetch(lichessApi + 'account', { headers })
+            const json = await response.json()
+            loginBtn.textContent = 'Logout with ' + json.username
+            loginBtn.onclick = logout
+        }
 
-    <input id='usernameInput' type="text" placeholder="username">
-    <label for="datePicker">Start date (default: forever)</label>
-    <input id="datePicker" type="date">
-    <button id='submitBtn' onclick="refresh()">Go</button>
-    <button id="abortBtn">Abort</button>
-    <button id="loginBtn" onclick="showLogin()">Login to Lichess</button>
-    <pre id="statusInfo"></pre>
-    <div id="calendar"></div>
+        // State management for oauth login
+        (async () => {
+            try {
+                let token = localStorage.getItem('accessToken')
+                console.log('Stored token is ', token)
+
+                if (token == null) {
+                    // Not logged in
+                    let code = localStorage.getItem('code')
+                    console.log('No token. Stored code is', code)
+
+                    if (code == null) {
+                        // Not in oauth process
+                        const urlParams = new URLSearchParams(window.location.search)
+                        code = urlParams.get('code')
+                        if (!code) return // Initial state
+                    }
+                    localStorage.setItem('code', code)
+                    window.history.replaceState(null, document.title, clientUrl)
+
+                    let codeVerifier = localStorage.getItem('codeVerifier')
+                    if (!codeVerifier) throw new Error('codeVerifier was lost')
+
+                    console.log('Found code', code, 'Fetching new token')
+                    const response = await fetch(lichessApi + 'token', {
+                        method: 'POST', body: new URLSearchParams({
+                            grant_type: 'authorization_code',
+                            code: code,
+                            redirect_uri: clientUrl,
+                            client_id: clientId,
+                            code_verifier: codeVerifier
+                        })
+                    })
+                    if (!response.ok) throw new Error('Error ' + response.status + 'while requesting new API token')
+                    const json = await response.json()
+                    token = json.access_token
+                    localStorage.setItem('accessToken', token)
+                    console.log('Got fresh token', token)
+                }
+
+                if (token) InitializeWithToken(token)
+
+            } catch (error) {
+                await logout()
+                statusInfo.textContent = error.message
+            }
+
+        })()
+
+
+        inputForm.onsubmit = e => { e.preventDefault(); drawCalendar() }
+
+    </script>
 </body>
 
 </html>
