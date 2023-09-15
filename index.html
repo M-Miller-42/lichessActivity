@@ -112,7 +112,9 @@
     <pre id="statusInfo"></pre>
     <div id="calendar"></div>
 
-    <!-- Snippet for PKCE taken from 
+
+
+    <!-- Snippet for PKCE taken from
     https://github.com/crouchcd/pkce-challenge/blob/0b5a1a35b83bfb973ca492a2d8df9fe1b163d066/src/index.ts -->
     <script>
         function randomString(length) {
@@ -148,6 +150,7 @@
     </script>
 
 
+
     <script>
         'use strict'
         const lichessApi = 'https://lichess.org/api/'
@@ -174,10 +177,6 @@
             'Mo,Tu,We,Th,Fr,Sa,Su'.split(',').forEach(weekday => {
                 const weekdayEl = document.createElement('span')
                 weekdayEl.textContent = weekday
-
-
-
-                
                 yearEl.appendChild(weekdayEl)
             })
 
@@ -365,7 +364,7 @@
                             code_verifier: codeVerifier
                         })
                     })
-                    if (!response.ok) throw new Error('Error ' + response.status + 'while requesting new API token')
+                    if (!response.ok) throw new Error(`Error ${response.status} while requesting new API token.`)
                     const json = await response.json()
                     token = json.access_token
                     localStorage.setItem('accessToken', token)
