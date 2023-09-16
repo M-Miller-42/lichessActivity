@@ -36,9 +36,17 @@
                 }
             }
 
-            input {
+            [type="text"], [type="date"], [type="submit"] {
                 width: 100%;
                 margin-bottom: 1em;
+            }
+
+            #filters {
+                flex-direction: column;
+
+                label {
+                    text-transform: capitalize;
+                }
             }
         }
 
@@ -111,7 +119,14 @@
         </div>
         <label for="datePicker">Start date (optional)</label>
         <input id="datePicker" type="date">
+
+        <details><summary>Filters</summary>
+            <div id="filters"></div>
+        </details>
     </form>
+
+
+
     <button id="loginBtn" onclick="login()">Login to Lichess (optional)</button>
     <abbr title="The Lichess API is faster when logged in">Why?</abbr>
     <pre id="statusInfo"></pre>
@@ -160,6 +175,7 @@
 
     <script>
         'use strict'
+        const FILTERS = ['ultraBullet','bullet','blitz','rapid','classical','correspondence','chess960','crazyhouse','antichess','atomic','horde','kingOfTheHill','racingKings','threeCheck']
         const lichessApi = 'https://lichess.org/api/'
         const lichessOauth = 'https://lichess.org/oauth'
         const lichessGames = 'https://lichess.org/@/'
@@ -171,6 +187,12 @@
         })()
         let headers
 
+        function activeFilters() {
+            return Array.from(
+                document.querySelectorAll('#filters :checked'),
+                checkbox => checkbox.name)
+                .join(',')
+        }
 
         function getOrCreateYearNode(year, years) {
             if (years[year]) {
@@ -224,6 +246,7 @@
             url.pathname += '/search'
             url.searchParams.append('dateMin', toLocalYYYYMMDD(date))
             url.searchParams.append('dateMax', toLocalYYYYMMDD(dayAfter))
+            url.searchParams.append('perf', activeFilters())
             return url
         }
 
@@ -266,6 +289,7 @@
             url.searchParams.append('sort', 'dateAsc')
             url.searchParams.append('moves', 'false')
             url.searchParams.append('evals', 'false')
+            url.searchParams.append('perfType', activeFilters())
             since && url.searchParams.append('since', since)
             return url
         }
@@ -389,6 +413,16 @@
 
 
         inputForm.onsubmit = e => { e.preventDefault(); drawCalendar() }
+        FILTERS.forEach(filter => {
+            const label = document.createElement('label')
+            label.textContent = filter
+            const checkbox = document.createElement('input')
+            checkbox.type = 'checkbox'
+            checkbox.name = filter
+            checkbox.checked = true
+            label.prepend(checkbox)
+            filters.appendChild(label)
+        })
 
     </script>
 </body>
