@@ -32,16 +32,24 @@
         }
 
         #inputForm {
+            width: min(100%, 15em);
+
+            * {
+                width: 100%;
+            }
             div {
                 display: flex;
+
+                input {
+                    padding: 1em;
+                }
 
                 [type=submit] {
                     flex: 0;
                 }
             }
 
-            [type="text"], [type="date"], [type="submit"] {
-                width: 100%;
+            details, input {
                 margin-bottom: 1em;
             }
 
@@ -50,6 +58,11 @@
 
                 label {
                     text-transform: capitalize;
+                }
+
+                [type="checkbox"] {
+                    width: initial;
+                    margin-bottom: initial;
                 }
             }
         }
@@ -130,18 +143,20 @@
             <input id="usernameInput" type="text" placeholder="username" required>
             <input type="submit" id="submitBtn" value="Go">
         </div>
-        <label for="datePicker">Start date (optional)</label>
-        <input id="datePicker" type="date">
 
         <details><summary>Filters</summary>
+            <label for="datePicker">Start date (optional)
+                <input id="datePicker" type="date">
+            </label>
             <div id="filters"></div>
         </details>
+        <button id="loginBtn" onclick="login()">Login to Lichess (optional)</button>
+        <abbr title="The Lichess API is faster when logged in">Why?</abbr>
     </form>
 
 
 
-    <button id="loginBtn" onclick="login()">Login to Lichess (optional)</button>
-    <abbr title="The Lichess API is faster when logged in">Why?</abbr>
+
     <pre id="statusInfo"></pre>
     <div id="calendar"></div>
     <span>Be responsible with the amount of data you download. Consider becoming a <a href="https://lichess.org/patron">Lichess patron</a>.</span>
