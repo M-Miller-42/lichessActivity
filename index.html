@@ -17,13 +17,17 @@
             color: #fff;
             background-color: #222;
             font-family: sans;
-            margin: 5em;
+            margin-top: 5em;
             display: flex;
             flex-direction: column;
             align-items: center;
 
             a {
                 color: white;
+            }
+
+            h1 {
+                text-align: center;
             }
         }
 
@@ -54,6 +58,10 @@
         #calendar {
             display: flex;
             flex-direction: column;
+            overflow-x: auto;
+            max-width: 100%;
+            scroll-behavior: smooth;
+            mask-image: linear-gradient(to right, transparent 0%, black 1em, black calc(100% - 1em), transparent 100%);
 
             .year {
                 --day-size: 1em;
