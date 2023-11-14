@@ -177,7 +177,7 @@
             window.location = url
         }
 
-        function resetBtn() {
+        function resetGoBtn() {
             submitBtn.value = 'Go'
             submitBtn.onclick = undefined
         }
@@ -194,7 +194,7 @@
             return url
         }
 
-        async function drawCalendar() {
+        async function createCalendar() {
             statusInfo.innerText = `Requesting games for user '${usernameInput.value}'`
 
             const aborter = new AbortController()
@@ -208,7 +208,7 @@
             let lastInPreviousChunk
 
             submitBtn.value = 'Abort'
-            submitBtn.onclick = e => { e.preventDefault(); aborter.abort(); statusInfo.innerText += ' Aborted!'; resetBtn() }
+            submitBtn.onclick = e => { e.preventDefault(); aborter.abort(); statusInfo.innerText += ' Aborted!'; resetGoBtn() }
 
             calendar.replaceChildren()
 
@@ -216,7 +216,7 @@
             const response = await fetch(url, { signal: aborter.signal, headers })
             if (!response.ok) {
                 statusInfo.innerText = `Error ${response.status} while fetching games for user '${usernameInput.value}'`
-                resetBtn()
+                resetGoBtn()
                 return
             }
 
@@ -250,7 +250,7 @@
                 lastInPreviousChunk = lastInThisChunk
             }
             statusInfo.innerText += ' Done!'
-            resetBtn()
+            resetGoBtn()
         }
 
         async function InitializeWithToken(token) {
@@ -311,8 +311,7 @@
 
         })()
 
-
-        inputForm.onsubmit = e => { e.preventDefault(); drawCalendar() }
+        inputForm.onsubmit = e => { e.preventDefault(); createCalendar() }
         FILTERS.forEach(filter => {
             const label = document.createElement('label')
             label.textContent = filter
