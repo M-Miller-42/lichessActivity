@@ -94,7 +94,7 @@ body {
             left: 0.1em;
             height: 100%;
             text-align: center;
-            writing-mode: sideways-rl;
+            writing-mode: tb;
             font-size: 3em;
         }
 
@@ -119,8 +119,7 @@ body {
         }
 
         span {
-            width: initial;
-            font-family: mono;
+            font-family: monospace;
         }
     }
 }

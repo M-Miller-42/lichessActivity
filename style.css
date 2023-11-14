@@ -84,7 +84,7 @@ body h1 {
   left: 0.1em;
   height: 100%;
   text-align: center;
-  writing-mode: sideways-rl;
+  writing-mode: tb;
   font-size: 3em;
 }
 #calendar .year * {
@@ -103,8 +103,7 @@ body h1 {
   box-shadow: 0 0 1em gold;
 }
 #calendar .year span {
-  width: initial;
-  font-family: mono;
+  font-family: monospace;
 }
 
 /*# sourceMappingURL=style.css.map */
