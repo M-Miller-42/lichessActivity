@@ -4,9 +4,9 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <link rel="shortcut icon" type="image/ico" href="favicon.ico"/>
+    <link rel="shortcut icon" type="image/ico" href="favicon.ico" />
     <title>Lichess Activity Heatmap</title>
-    <link href="style.css" type="text/css" rel="stylesheet"/>
+    <link href="style.css" type="text/css" rel="stylesheet" />
 </head>
 
 <body>
@@ -17,75 +17,38 @@
             <input type="submit" id="submitBtn" value="Go">
         </div>
 
-        <details><summary>Filters</summary>
+        <details>
+            <summary>Filters</summary>
             <label for="datePicker">Start date (optional)
                 <input id="datePicker" type="date">
             </label>
             <div id="filters"></div>
         </details>
     </form>
-
-    <button id="loginBtn" onclick="login()">Login to Lichess (optional)</button>
+    <button id="loginBtn">Login to Lichess (optional)</button>
     <abbr title="The Lichess API is faster when logged in">Why?</abbr>
 
     <pre id="statusInfo"></pre>
     <div id="calendar"></div>
-    <span>Be responsible with the amount of data you download. Consider becoming a <a href="https://lichess.org/patron">Lichess patron</a>.</span>
+    <span>Be responsible with the amount of data you download. Consider becoming a <a
+            href="https://lichess.org/patron">Lichess patron</a>.</span>
     <a href="https://github.com/M-Miller-42/lichessActivity" target="_blank" rel="noopener noreferrer">Source Code</a>
 
 
 
-    <!-- Snippet for PKCE taken from
-    https://github.com/crouchcd/pkce-challenge/blob/0b5a1a35b83bfb973ca492a2d8df9fe1b163d066/src/index.ts -->
-    <script>
-        function randomString(length) {
-            const mask =
-                'abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789-._~';
-            let result = '';
-            const randomUints = crypto.getRandomValues(new Uint8Array(length));
-            for (let i = 0; i < length; i++) {
-                // cap the value of the randomIndex to mask.length - 1
-                const randomIndex = randomUints[i] % mask.length;
-                result += mask[randomIndex];
-            }
-            return result;
-        }
 
-        /** Generate a PKCE code challenge from a code verifier
-         * @param code_verifier
-         * @returns The base64 url encoded code challenge
-         */
-        async function generateChallenge(code_verifier) {
-            const buffer = await crypto.subtle.digest(
-                'SHA-256',
-                new TextEncoder().encode(code_verifier)
-            );
-            // Generate base64url string
-            // btoa is deprecated in Node.js but is used here for web browser compatibility
-            // (which has no good replacement yet, see also https://github.com/whatwg/html/issues/6811)
-            return btoa(String.fromCharCode(...new Uint8Array(buffer)))
-                .replace(/\//g, '_')
-                .replace(/\+/g, '-')
-                .replace(/=/g, '');
-        }
-    </script>
-
-
-
+    <script src="OauthManager.js"></script>
     <script>
         'use strict'
-        const FILTERS = ['ultraBullet','bullet','blitz','rapid','classical','correspondence','chess960','crazyhouse','antichess','atomic','horde','kingOfTheHill','racingKings','threeCheck']
+        const FILTERS = ['ultraBullet', 'bullet', 'blitz', 'rapid', 'classical', 'correspondence', 'chess960', 'crazyhouse', 'antichess', 'atomic', 'horde', 'kingOfTheHill', 'racingKings', 'threeCheck']
         const LICHESS_API = 'https://lichess.org/api/'
         const LICHESS_OAUTH = 'https://lichess.org/oauth'
         const LICHESS_GAMES = 'https://lichess.org/@/'
         const CLIENT_ID = 'dailyActivityHeatmap'
 
-        const clientUrl = (() => {
-            const url = new URL(location.href)
-            url.search = ''
-            return url.href
-        })()
-        let headers
+        let headers = new Headers()
+        const oauthLoginManager = new OauthLoginManager(LICHESS_OAUTH, LICHESS_API, CLIENT_ID)
+
 
         function activeFilters() {
             return Array.from(
@@ -150,38 +113,6 @@
             return url
         }
 
-        async function logout() {
-            console.log('Logging out')
-            await fetch(LICHESS_API + 'token', { headers, method: 'DELETE' })
-            headers = {}
-            localStorage.clear()
-            window.history.replaceState(null, document.title, clientUrl)
-            statusInfo.innerText = 'Logged out'
-            loginBtn.onclick = login
-            loginBtn.textContent = 'Login to Lichess (optional)'
-
-        }
-
-        async function login() {
-            const codeVerifier = randomString(129)
-            localStorage.setItem('codeVerifier', codeVerifier)
-            const challenge = await generateChallenge(codeVerifier)
-            const url = new URL(LICHESS_OAUTH)
-            url.searchParams.append('response_type', 'code')
-            url.searchParams.append('redirect_uri', clientUrl)
-            url.searchParams.append('client_id', CLIENT_ID)
-            url.searchParams.append('scope', '')
-            url.searchParams.append('state', randomString(33))
-            url.searchParams.append('code_challenge', challenge)
-            url.searchParams.append('code_challenge_method', 'S256')
-            window.location = url
-        }
-
-        function resetGoBtn() {
-            submitBtn.value = 'Go'
-            submitBtn.onclick = undefined
-        }
-
         function createApiUrl(username, since) {
             const url = new URL(LICHESS_API)
             url.pathname += 'games/user/'
@@ -192,6 +123,26 @@
             url.searchParams.append('perfType', activeFilters())
             since && url.searchParams.append('since', since)
             return url
+        }
+
+        async function onAuthorization(event) {
+            headers.append('Authorization', 'Bearer ' + event.detail.token)
+            const response = await fetch(LICHESS_API + 'account', { headers })
+            const json = await response.json()
+            loginBtn.onclick = () => oauthLoginManager.requestLogout()
+            loginBtn.textContent = 'Logout with ' + json.username
+        }
+
+        async function onLogout() {
+            headers = new Headers()
+            statusInfo.innerText = 'Logged out'
+            loginBtn.onclick = () => oauthLoginManager.requestLogin()
+            loginBtn.textContent = 'Login to Lichess (optional)'
+        }
+
+        function resetGoBtn() {
+            submitBtn.value = 'Go'
+            submitBtn.onclick = undefined
         }
 
         async function createCalendar() {
@@ -224,10 +175,9 @@
             // for await (const chunk of response.body)
             const reader = response.body.getReader();
             let chunk, done = false
-            while(!done)
-            {
-                ({value:chunk, done} = await reader.read())
-                if(done) break
+            while (!done) {
+                ({ value: chunk, done } = await reader.read())
+                if (done) break
                 const games = new TextDecoder().decode(chunk).split('\n\n\n').filter(game => game)
 
                 for (const game of games) {
@@ -260,75 +210,32 @@
             resetGoBtn()
         }
 
-        async function InitializeWithToken(token) {
-            console.log('Using token', token)
-            headers = { Authorization: 'Bearer ' + token }
-            const response = await fetch(LICHESS_API + 'account', { headers })
-            const json = await response.json()
-            loginBtn.textContent = 'Logout with ' + json.username
-            loginBtn.onclick = logout
-        }
+        async function initialize() {
+            inputForm.onsubmit = e => { e.preventDefault(); createCalendar() }
+            loginBtn.onclick = () => oauthLoginManager.requestLogin()
 
-        // State management for oauth login
-        (async () => {
+            FILTERS.forEach(filter => {
+                const label = document.createElement('label')
+                label.textContent = filter
+                const checkbox = document.createElement('input')
+                checkbox.type = 'checkbox'
+                checkbox.name = filter
+                checkbox.checked = true
+                label.prepend(checkbox)
+                filters.appendChild(label)
+            })
+            oauthLoginManager.addEventListener('authorization', onAuthorization)
+            oauthLoginManager.addEventListener('logout', onLogout)
+
             try {
-                let token = localStorage.getItem('accessToken')
-                console.log('Stored token is ', token)
-
-                if (token == null) {
-                    // Not logged in
-                    let code = localStorage.getItem('code')
-                    console.log('No token. Stored code is', code)
-
-                    if (code == null) {
-                        // Not in oauth process
-                        const urlParams = new URLSearchParams(window.location.search)
-                        code = urlParams.get('code')
-                        if (!code) return // Initial state
-                    }
-                    localStorage.setItem('code', code)
-                    window.history.replaceState(null, document.title, clientUrl)
-
-                    let codeVerifier = localStorage.getItem('codeVerifier')
-                    if (!codeVerifier) throw new Error('codeVerifier was lost')
-
-                    console.log('Found code', code, 'Fetching new token')
-                    const response = await fetch(LICHESS_API + 'token', {
-                        method: 'POST', body: new URLSearchParams({
-                            grant_type: 'authorization_code',
-                            code: code,
-                            redirect_uri: clientUrl,
-                            client_id: CLIENT_ID,
-                            code_verifier: codeVerifier
-                        })
-                    })
-                    if (!response.ok) throw new Error(`Error ${response.status} while requesting new API token.`)
-                    const json = await response.json()
-                    token = json.access_token
-                    localStorage.setItem('accessToken', token)
-                    console.log('Got fresh token', token)
-                }
-
-                if (token) InitializeWithToken(token)
-
+                await oauthLoginManager.initialize()
             } catch (error) {
-                await logout()
+                await oauthLoginManager.requestLogout()
                 statusInfo.textContent = error.message
             }
+        }
 
-        })()
-
-        inputForm.onsubmit = e => { e.preventDefault(); createCalendar() }
-        FILTERS.forEach(filter => {
-            const label = document.createElement('label')
-            label.textContent = filter
-            const checkbox = document.createElement('input')
-            checkbox.type = 'checkbox'
-            checkbox.name = filter
-            checkbox.checked = true
-            label.prepend(checkbox)
-            filters.appendChild(label)
-        })
+        initialize()
 
     </script>
 </body>
