@@ -75,10 +75,11 @@
     <script>
         'use strict'
         const FILTERS = ['ultraBullet','bullet','blitz','rapid','classical','correspondence','chess960','crazyhouse','antichess','atomic','horde','kingOfTheHill','racingKings','threeCheck']
-        const lichessApi = 'https://lichess.org/api/'
-        const lichessOauth = 'https://lichess.org/oauth'
-        const lichessGames = 'https://lichess.org/@/'
-        const clientId = 'dailyActivityHeatmap'
+        const LICHESS_API = 'https://lichess.org/api/'
+        const LICHESS_OAUTH = 'https://lichess.org/oauth'
+        const LICHESS_GAMES = 'https://lichess.org/@/'
+        const CLIENT_ID = 'dailyActivityHeatmap'
+
         const clientUrl = (() => {
             const url = new URL(location.href)
             url.search = ''
@@ -140,7 +141,7 @@
         function createUrlForDay(date) {
             const dayAfter = new Date(date)
             dayAfter.setDate(date.getDate() + 1)
-            const url = new URL(lichessGames)
+            const url = new URL(LICHESS_GAMES)
             url.pathname += usernameInput.value
             url.pathname += '/search'
             url.searchParams.append('dateMin', toLocalYYYYMMDD(date))
@@ -151,7 +152,7 @@
 
         async function logout() {
             console.log('Logging out')
-            await fetch(lichessApi + 'token', { headers, method: 'DELETE' })
+            await fetch(LICHESS_API + 'token', { headers, method: 'DELETE' })
             headers = {}
             localStorage.clear()
             window.history.replaceState(null, document.title, clientUrl)
@@ -165,10 +166,10 @@
             const codeVerifier = randomString(129)
             localStorage.setItem('codeVerifier', codeVerifier)
             const challenge = await generateChallenge(codeVerifier)
-            const url = new URL(lichessOauth)
+            const url = new URL(LICHESS_OAUTH)
             url.searchParams.append('response_type', 'code')
             url.searchParams.append('redirect_uri', clientUrl)
-            url.searchParams.append('client_id', clientId)
+            url.searchParams.append('client_id', CLIENT_ID)
             url.searchParams.append('scope', '')
             url.searchParams.append('state', randomString(33))
             url.searchParams.append('code_challenge', challenge)
@@ -182,7 +183,7 @@
         }
 
         function createApiUrl(username, since) {
-            const url = new URL(lichessApi)
+            const url = new URL(LICHESS_API)
             url.pathname += 'games/user/'
             url.pathname += username
             url.searchParams.append('sort', 'dateAsc')
@@ -255,7 +256,7 @@
         async function InitializeWithToken(token) {
             console.log('Using token', token)
             headers = { Authorization: 'Bearer ' + token }
-            const response = await fetch(lichessApi + 'account', { headers })
+            const response = await fetch(LICHESS_API + 'account', { headers })
             const json = await response.json()
             loginBtn.textContent = 'Logout with ' + json.username
             loginBtn.onclick = logout
@@ -285,12 +286,12 @@
                     if (!codeVerifier) throw new Error('codeVerifier was lost')
 
                     console.log('Found code', code, 'Fetching new token')
-                    const response = await fetch(lichessApi + 'token', {
+                    const response = await fetch(LICHESS_API + 'token', {
                         method: 'POST', body: new URLSearchParams({
                             grant_type: 'authorization_code',
                             code: code,
                             redirect_uri: clientUrl,
-                            client_id: clientId,
+                            client_id: CLIENT_ID,
                             code_verifier: codeVerifier
                         })
                     })
