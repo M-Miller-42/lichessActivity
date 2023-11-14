@@ -220,7 +220,14 @@
                 return
             }
 
-            for await (const chunk of response.body) {
+            // for await is not supported in Chrome
+            // for await (const chunk of response.body)
+            const reader = response.body.getReader();
+            let chunk, done = false
+            while(!done)
+            {
+                ({value:chunk, done} = await reader.read())
+                if(done) break
                 const games = new TextDecoder().decode(chunk).split('\n\n\n').filter(game => game)
 
                 for (const game of games) {
