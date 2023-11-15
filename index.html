@@ -50,49 +50,11 @@
         const oauthLoginManager = new OauthLoginManager(LICHESS_OAUTH, LICHESS_API, CLIENT_ID)
 
 
-        function activeFilters() {
+        function getActiveFilters() {
             return Array.from(
                 document.querySelectorAll('#filters :checked'),
                 checkbox => checkbox.name)
                 .join(',')
-        }
-
-        function getOrCreateYearNode(year, years) {
-            if (years[year]) {
-                return years[year]
-            }
-            const yearEl = document.createElement('div')
-            yearEl.classList.add('year')
-            yearEl.style.order = year
-            yearEl.dataset.year = year
-
-            'Mo,Tu,We,Th,Fr,Sa,Su'.split(',').forEach(weekday => {
-                const weekdayEl = document.createElement('span')
-                weekdayEl.textContent = weekday
-                yearEl.appendChild(weekdayEl)
-            })
-
-            // If the year does not start with Monday, add some filler days
-            // Starting with Monday=0
-            const firstWeekdayIndex = (new Date(year, 0, 1).getDay() + 6) % 7
-            for (const _ of Array(firstWeekdayIndex)) {
-                yearEl.appendChild(document.createElement('div'))
-            }
-
-            calendar.appendChild(yearEl)
-            years[year] = yearEl
-            return yearEl
-        }
-
-        function getOrCreateDayNode(date, previous) {
-            if (previous && previous.date.getTime() == date.getTime()) {
-                return previous.dayEl
-            }
-            const dayEl = document.createElement('a')
-            dayEl.classList.add('day')
-            dayEl.href = createUrlForDay(date)
-            dayEl.target = '_blank'
-            return dayEl
         }
 
         function toLocalYYYYMMDD(date) {
@@ -109,7 +71,7 @@
             url.pathname += '/search'
             url.searchParams.append('dateMin', toLocalYYYYMMDD(date))
             url.searchParams.append('dateMax', toLocalYYYYMMDD(dayAfter))
-            url.searchParams.append('perf', activeFilters())
+            url.searchParams.append('perf', getActiveFilters())
             return url
         }
 
@@ -120,7 +82,7 @@
             url.searchParams.append('sort', 'dateAsc')
             url.searchParams.append('moves', 'false')
             url.searchParams.append('evals', 'false')
-            url.searchParams.append('perfType', activeFilters())
+            url.searchParams.append('perfType', getActiveFilters())
             since && url.searchParams.append('since', since)
             return url
         }
@@ -145,19 +107,81 @@
             submitBtn.onclick = undefined
         }
 
-        async function createCalendar() {
-            statusInfo.innerText = `Requesting games for user '${usernameInput.value}'`
+        function getOrCreateYearNode(year, years) {
+            if (years.has(year)) {
+                return years.get(year)
+            }
+            const yearNode = document.createElement('div')
+            yearNode.classList.add('year')
+            yearNode.style.order = year
+            yearNode.dataset.year = year
 
+            'Mo,Tu,We,Th,Fr,Sa,Su'.split(',').forEach(weekday => {
+                const weekdayEl = document.createElement('span')
+                weekdayEl.textContent = weekday
+                yearNode.appendChild(weekdayEl)
+            })
+
+            // If the year does not start with Monday, add some filler days
+            // Starting with Monday=0
+            const firstWeekdayIndex = (new Date(year, 0, 1).getDay() + 6) % 7
+            for (const _ of Array(firstWeekdayIndex)) {
+                yearNode.appendChild(document.createElement('div'))
+            }
+
+            calendar.appendChild(yearNode)
+            years.set(year, yearNode)
+            return yearNode
+        }
+
+        function getOrCreateDayNode(date, previous) {
+            if (previous && previous.date.getTime() == date.getTime()) {
+                return previous.dayNode
+            }
+            const dayNode = document.createElement('a')
+            dayNode.classList.add('day')
+            dayNode.href = createUrlForDay(date)
+            dayNode.target = '_blank'
+            return dayNode
+        }
+
+        function addToHistogram(histogram, games) {
+            for (const game of games) {
+                const { year, month, day } = game.match(/\[Date "(?<year>\d\d\d\d)\.(?<month>\d\d)\.(?<day>\d\d)"\]/).groups
+                const date = new Date(year, month - 1, day)
+                const entry = histogram.get(date.getTime()) ?? 0
+                histogram.set(date.getTime(), entry + 1)
+                histogram.maximum = Math.max(histogram.maximum, entry + 1)
+                histogram.last = date
+            }
+        }
+
+        function updateCalendar(histogram, years, lastUpdatedDay) {
+            // Fallback to the first day of a year as starting date
+            for (let date = lastUpdatedDay?.date ?? new Date(histogram.last.getFullYear(), 0, 1);
+                date <= histogram.last;
+                date.setDate(date.getDate() + 1)) {
+
+                const gamesPlayed = histogram.get(date.getTime()) ?? 0
+                const dayNode = getOrCreateDayNode(date, lastUpdatedDay)
+                lastUpdatedDay = { date: new Date(date), dayNode }
+                dayNode.title = gamesPlayed + ' games played on ' + date.toDateString()
+                dayNode.style.setProperty('--x', gamesPlayed)
+                getOrCreateYearNode(date.getFullYear(), years).appendChild(dayNode)
+            }
+            return lastUpdatedDay
+        }
+
+        async function createCalendar() {
             const aborter = new AbortController()
             const since = datePicker.valueAsDate?.getTime()
-            const years = {}
-            const days = {}
-            let maxPerDay = 0
+            const years = new Map()
+            const histogram = new Map()
+            histogram.maximum = 0
             let gameCounter = 0
-            let previousDay
-            let lastInThisChunk
-            let lastInPreviousChunk
+            let lastUpdatedDay
 
+            statusInfo.innerText = `Requesting games for user '${usernameInput.value}'`
             submitBtn.value = 'Abort'
             submitBtn.onclick = e => { e.preventDefault(); aborter.abort(); statusInfo.innerText += ' Aborted!'; resetGoBtn() }
 
@@ -171,40 +195,20 @@
                 return
             }
 
-            // for await is not supported in Chrome
+            // for await is not supported in Chrome (https://caniuse.com/mdn-api_readablestream_--asynciterator)
             // for await (const chunk of response.body)
             const reader = response.body.getReader();
             let chunk, done = false
             while (!done) {
                 ({ value: chunk, done } = await reader.read())
                 if (done) break
+
                 const games = new TextDecoder().decode(chunk).split('\n\n\n').filter(game => game)
+                addToHistogram(histogram, games)
+                statusInfo.innerText = `Downloaded ${gameCounter += games.length} games`
+                calendar.style.setProperty('--max', histogram.maximum)
 
-                for (const game of games) {
-                    statusInfo.innerText = `Downloaded ${gameCounter += 1} games`
-                    const { year, month, day } = game.match(/\[Date "(?<year>\d\d\d\d)\.(?<month>\d\d)\.(?<day>\d\d)"\]/).groups
-                    const date = new Date(year, month - 1, day)
-                    const entry = days[date.getTime()] ?? 0
-                    days[date.getTime()] = entry + 1
-                    maxPerDay = Math.max(maxPerDay, entry + 1)
-                    lastInThisChunk = date
-                }
-
-                calendar.style.setProperty('--max', maxPerDay)
-
-                // Fallback to first day of year
-                lastInPreviousChunk = lastInPreviousChunk ?? new Date(lastInThisChunk.getFullYear(), 0, 1)
-                for (let date = lastInPreviousChunk; date <= lastInThisChunk; date.setDate(date.getDate() + 1)) {
-                    const gamesPlayed = days[date.getTime()] ?? 0
-                    const dayEl = getOrCreateDayNode(date, previousDay)
-                    previousDay = { date: new Date(date), dayEl }
-                    dayEl.title = gamesPlayed + ' games played on ' + date.toDateString()
-                    dayEl.style.setProperty('--x', gamesPlayed)
-                    dayEl.style.setProperty('--r', 'calc(var(--x) / var(--max)')
-                    const yearEl = getOrCreateYearNode(date.getFullYear(), years)
-                    yearEl.appendChild(dayEl)
-                }
-                lastInPreviousChunk = lastInThisChunk
+                lastUpdatedDay = updateCalendar(histogram, years, lastUpdatedDay)
             }
             statusInfo.innerText += ' Done!'
             resetGoBtn()

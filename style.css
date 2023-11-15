@@ -92,11 +92,12 @@ body h1 {
   height: var(--day-size);
 }
 #calendar .year .day {
+  --ratio: calc(var(--x) / var(--max));
   border-radius: 0.2em;
   background-color: #080064;
   background-image: url(data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAQEAAAABCAYAAADemxtJAAAACXBIWXMAAA7DAAAOwwHHb6hkAAAAGXRFWHRTb2Z0d2FyZQB3d3cuaW5rc2NhcGUub3Jnm+48GgAAAKdJREFUOI2NkEESwyAMAxc+3o8XqQeYYMBNckJC9hpTvvoYGdsgQzi9eIH2u9NPluZ9ws/nrT0ZP33T1nO/j0AFu2JV7ApB2xUyfdWW574kf1dbzloN/4b7t/aZezcjry2I/s8GjFHQh7dRyGx6f2AoZMaDH3i7D9ow5iV8GPOnvniLn/p6jzN+sm/k7/se+91l/b65IQtZtHHKQmjJ1rxNz54nvFHzA4thDpAaUxnxAAAAAElFTkSuQmCC);
   background-size: cover;
-  background-position-x: calc(256 * var(--day-size) * (var(--r) - 1));
+  background-position-x: calc(256 * var(--day-size) * (var(--ratio) - 1));
 }
 #calendar .year .day:hover {
   transform: scale(1.3);
