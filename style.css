@@ -18,6 +18,11 @@ body a {
 }
 body h1 {
   text-align: center;
+  margin-bottom: 0;
+}
+body .description {
+  font-style: italic;
+  margin-bottom: 3em;
 }
 
 #inputForm {
