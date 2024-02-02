@@ -1,13 +1,19 @@
 'use strict'
 /**
- * Implements Authorization Code Flow with Proof Key for Code Exchange (PKCE)
+ * Implements Authorization Code Flow with 
+ * Proof Key for Code Exchange (PKCE)
  * 
- * 1. Calling requestLogin() creates a cryptographically-random code_verifier and from this generates a code_challenge.
- * 2. Redirect the user to the Authorization Server (`oauthEndpoint`) along with the code_challenge.
+ * 1. Calling requestLogin() creates a cryptographically-random code_verifier
+ *      and the corresponding code_challenge.
+ * 2. Redirect the user to the Authorization Server (`oauthEndpoint`) 
+ *      along with the code_challenge.
  * 3. The Authorization Server redirects the user to a login and authorization prompt.
- * 4. The Authorization Server stores the code_challenge and redirects the user back to the application with an authorization code.
- * 5. We send a token request with this code and the code_verifier to the Authorization Server (`apiEndpoint`)
- * 6. The Authorization Server responds with an access token that is wrapped in the 'authorization' event
+ * 4. The Authorization Server stores the code_challenge and 
+ *      redirects the user back to the application with an authorization code.
+ * 5. We send a token request with this code and the code_verifier 
+ *      to the Authorization Server (`apiEndpoint`).
+ * 6. The Authorization Server responds with an access token 
+ *      that is then emitted in the 'authorization' event.
  * 
  * @emits login After receiving the access token
  * @emits logout After invalidating the access token
